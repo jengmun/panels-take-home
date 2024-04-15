@@ -1,12 +1,7 @@
 import matplotlib.pyplot as plt
 from shapely.geometry import Polygon
-from shapely.affinity import rotate
 
-PANEL_SIZES = [(2, 1), (2.3, 1), (1.8, 0.9)]
-PANEL_DISTANCE = 0.02
-ROW_DISTANCE = 0.5
-# Assume distance from boundary is panel distance
-BOUNDARY_DISTANCE = PANEL_DISTANCE
+panel_sizes = [(2, 1), (2.3, 1), (1.8, 0.9)]
 
 rooftop1_coords = [(0,0), (0, 100), (50, 0)]
 rooftop2_coords = [(1.12, 130.83), (1.12, 160.83), (31.12, 160.83), (31.12, 130.83), (11.12, 100.83), (-11.12, 90.83), (-30.12, 90.83), (-20.182, 120.273)]
@@ -17,93 +12,103 @@ rooftop3_coords = [(2, 100), (2,160), (131, 160), (35, 200), (11, 300), (-20 , 9
 # 2. Angle of rotation: 0, 90
 # 3. Shift
 
-def generate_layout(selected_rooftop, panel):
-    selected_rooftop_coords = selected_rooftop + [selected_rooftop[0]]
-   
-    rotation_angle = 0
+class LayoutOptimisation:
+    panel_distance = 0.02
+    row_distance = 0.5
+    # Assume distance from boundary is panel distance
+    boundary_distance = panel_distance
 
-    rooftop = rotate(Polygon(selected_rooftop_coords), rotation_angle)
-    xs, ys = zip(*rooftop.exterior.coords) 
+    def __init__(self, selected_rooftop, panel):
+        selected_rooftop_coords = selected_rooftop + [selected_rooftop[0]]
 
-    min_x = min(xs)
-    max_x = max(xs)
-    min_y = min(ys)
-    max_y = max(ys)
+        rooftop = Polygon(selected_rooftop_coords)
+        self.rooftop = rooftop
 
-    panel_width = panel[0]
-    panel_height = panel[1]
+        xs, ys = zip(*rooftop.exterior.coords) 
+        self.xs = xs
+        self.ys = ys
 
-    def get_panel_coords(x, y, width, height):
-        return [(x, y), (x + width, y), (x, y + height), (x + width, y + height)]
+        self.min_x = min(xs)
+        self.max_x = max(xs)
+        self.min_y = min(ys)
+        self.max_y = max(ys)
+
+        self.panel_length = panel[0]
+        self.panel_width = panel[1]
 
 
-    def get_layout(panel_width, panel_height, x_gap, y_gap):
-        x = min_x + BOUNDARY_DISTANCE
+    def get_panel_coords(self, x, y, length, width):
+        return [(x, y), (x + length, y), (x, y + width), (x + length, y + width)]
+        
+
+    def get_layout(self, panel_length, panel_width, x_gap, y_gap):
+        x = self.min_x + self.boundary_distance
         coord_list = []
 
-        while (max_x > x):
-            y = min_y + BOUNDARY_DISTANCE
+        while (self.max_x > x):
+            y = self.min_y + self.boundary_distance
 
-            while (max_y > y):
-                panel_coords = get_panel_coords(x, y, panel_width, panel_height)
+            while (self.max_y > y):
+                panel_coords = self.get_panel_coords(x, y, panel_length, panel_width)
                 panel_geometry = Polygon(panel_coords)
 
-                if rooftop.contains_properly(panel_geometry):             
+                if self.rooftop.contains_properly(panel_geometry):             
                     coord_list.append((x,y))
 
-                y += panel_height
+                y += panel_width
                 y += y_gap
 
-            x += panel_width
+            x += panel_length
             x += x_gap
 
         return coord_list
+    
 
-
-    def get_best_layout():
-        permutations = [{"panel_width": panel_width, "panel_height": panel_height, "x_gap": ROW_DISTANCE, "y_gap": PANEL_DISTANCE},
-                        {"panel_width": panel_width, "panel_height": panel_height, "x_gap": PANEL_DISTANCE, "y_gap": ROW_DISTANCE}]
-                        # {"panel_width": panel_height, "panel_height": panel_width, "y_gap": panel_distance, "x_gap": row_distance},
-                        # {"panel_width": panel_height, "panel_height": panel_width, "y_gap": row_distance, "x_gap": panel_distance}]
+    def get_best_layout(self):
+        permutations = [{"panel_length": self.panel_length, "panel_width": self.panel_width, "x_gap": self.row_distance, "y_gap": self.panel_distance},
+                        {"panel_length": self.panel_length, "panel_width": self.panel_width, "x_gap": self.panel_distance, "y_gap": self.row_distance},
+                        {"panel_length": self.panel_width, "panel_width": self.panel_length, "x_gap": self.row_distance, "y_gap": self.panel_distance},
+                        {"panel_length": self.panel_width, "panel_width": self.panel_length, "x_gap": self.panel_distance, "y_gap": self.row_distance}]
 
         chosen_permutation = permutations[0]
         chosen_permutation_coords = []
 
         for permutation in permutations:
-            coord_list = get_layout(panel_width=permutation["panel_width"], 
-                                    panel_height=permutation["panel_height"], 
-                                    x_gap=permutation["x_gap"], 
-                                    y_gap=permutation["y_gap"])
-            
+            coord_list = self.get_layout(panel_length=permutation["panel_length"], 
+                                         panel_width=permutation["panel_width"], 
+                                         x_gap=permutation["x_gap"], 
+                                         y_gap=permutation["y_gap"])
+                
             if len(coord_list) > len(chosen_permutation_coords):
                 chosen_permutation = permutation
                 chosen_permutation_coords = coord_list
 
         return {"chosen_permutation": chosen_permutation, "chosen_permutation_coords": chosen_permutation_coords}
+    
 
-
-    def visualise(chosen_permutation, chosen_permutation_coords):
+    def visualise(self, chosen_permutation, chosen_permutation_coords):
         plt.figure()
-        plt.plot(xs, ys, label="Rooftop")    
+        plt.plot(self.xs, self.ys, label="Rooftop")    
 
         for i, j in chosen_permutation_coords:
-            rectangle = plt.Rectangle((i, j), chosen_permutation["panel_width"], chosen_permutation["panel_height"], color='g')
-            # rectangle.set_angle(90)
+            rectangle = plt.Rectangle((i, j), chosen_permutation["panel_length"], chosen_permutation["panel_width"], facecolor='g', edgecolor="b")
+  
             plt.gca().add_patch(rectangle)
             
-
         plt.show()
 
 
-    best_layout = get_best_layout()
+def generate_layout(selected_rooftop, panel):
+    layout = LayoutOptimisation(selected_rooftop, panel)
+
+    best_layout = layout.get_best_layout()
     chosen_permutation = best_layout["chosen_permutation"]
     chosen_permutation_coords = best_layout["chosen_permutation_coords"]
 
-    print(len(chosen_permutation_coords))
-    visualise(chosen_permutation=chosen_permutation, chosen_permutation_coords=chosen_permutation_coords)
+    layout.visualise(chosen_permutation=chosen_permutation, chosen_permutation_coords=chosen_permutation_coords)
 
 
-generate_layout(rooftop1_coords, PANEL_SIZES[0])
+generate_layout(rooftop3_coords, panel_sizes[0])
 
 
 # Rooftop 1
