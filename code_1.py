@@ -19,9 +19,7 @@ class LayoutOptimisation:
     boundary_distance = panel_distance
 
     def __init__(self, selected_rooftop, panel):
-        selected_rooftop_coords = selected_rooftop + [selected_rooftop[0]]
-
-        rooftop = Polygon(selected_rooftop_coords)
+        rooftop = Polygon(selected_rooftop)
         self.rooftop = rooftop
 
         xs, ys = zip(*rooftop.exterior.coords) 
@@ -88,7 +86,7 @@ class LayoutOptimisation:
 
     def visualise(self, chosen_permutation, chosen_permutation_coords):
         plt.figure()
-        plt.plot(self.xs, self.ys, label="Rooftop")    
+        plt.plot(self.xs, self.ys)    
 
         for i, j in chosen_permutation_coords:
             rectangle = plt.Rectangle((i, j), chosen_permutation["panel_length"], chosen_permutation["panel_width"], facecolor='g', edgecolor="b")
@@ -108,7 +106,7 @@ def generate_layout(selected_rooftop, panel):
     layout.visualise(chosen_permutation=chosen_permutation, chosen_permutation_coords=chosen_permutation_coords)
 
 
-generate_layout(rooftop3_coords, panel_sizes[0])
+generate_layout(rooftop1_coords, panel_sizes[0])
 
 
 # Rooftop 1
